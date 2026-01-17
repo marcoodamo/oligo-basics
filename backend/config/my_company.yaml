@@ -1,0 +1,17 @@
+# My Company Identifiers
+# Used to distinguish supplier (our company) from customer (buyer)
+
+identifiers:
+  # List of company CNPJs (14 digits, no formatting)
+  cnpjs:
+    - "26980531000181"  # OLIGO BASICS NUTRICAO ANIMAL LTDA
+  
+  # List of company names/variations (case-insensitive matching)
+  names:
+    - "OLIGO BASICS"
+    - "OLIGO BÁSICS"
+    - "OLIGOBASICS"
+    - "OLIGO BASIC"
+    - "OLIGO BASICS NUTRICAO ANIMAL"
+    - "OLIGO BASICS NUTRIÇÃO ANIMAL"
+    # Add more variations as needed

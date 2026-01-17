@@ -1,0 +1,39 @@
+# Payment terms mapping
+# Keys are patterns found in documents, values are Business Central codes
+payment_terms:
+  "30 dias": "30D"
+  "30 DDL": "30DDL"
+  "28 DDL": "28DDL"
+  "45 dias": "45D"
+  "60 dias": "60D"
+  "90 dias": "90D"
+  "a vista": "AVISTA"
+  "à vista": "AVISTA"
+  "antecipado": "ANT"
+  "100% antecipado": "ANT"
+  "50% antecipado": "50ANT"
+
+# Shipping method mapping
+shipping_methods:
+  "CIF": "CIF"
+  "FOB": "FOB"
+  "cif": "CIF"
+  "fob": "FOB"
+  "EXW": "EXW"
+  "DDP": "DDP"
+
+# Currency mapping
+currencies:
+  "DOLAR": "USD"
+  "DOLLAR": "USD"
+  "DÓLAR": "USD"
+  "USD": "USD"
+  "US$": "USD"
+  "$": "USD"
+  "REAL": "BRL"
+  "REAIS": "BRL"
+  "BRL": "BRL"
+  "R$": "BRL"
+  "EURO": "EUR"
+  "EUR": "EUR"
+  "€": "EUR"
