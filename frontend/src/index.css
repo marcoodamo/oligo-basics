@@ -414,6 +414,80 @@ body {
   color: var(--text-primary);
 }
 
+/* ===== Order Selector (Multiple Delivery Dates) ===== */
+.order-selector {
+  background: rgba(91, 138, 60, 0.08);
+  border: 1px solid rgba(91, 138, 60, 0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.order-selector-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  color: var(--brand-green-dark);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.order-selector-header svg {
+  width: 18px;
+  height: 18px;
+  color: var(--brand-green);
+}
+
+.order-tabs-selector {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.order-tab-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--bg-card);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-width: 120px;
+}
+
+.order-tab-btn:hover {
+  border-color: var(--brand-green);
+  background: rgba(91, 138, 60, 0.05);
+}
+
+.order-tab-btn.active {
+  border-color: var(--brand-green);
+  background: var(--brand-green);
+  color: white;
+}
+
+.order-tab-date {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.order-tab-btn.active .order-tab-date {
+  color: white;
+}
+
+.order-tab-count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.order-tab-btn.active .order-tab-count {
+  color: rgba(255, 255, 255, 0.8);
+}
+
 /* ===== Sections ===== */
 .section {
   margin-bottom: var(--space-lg);
