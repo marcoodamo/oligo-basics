@@ -291,6 +291,47 @@ def ensure_complete_schema(result: Dict) -> Dict:
     return merge(empty, result)
 
 
+def split_orders_by_delivery_date(result: Dict) -> List[Dict]:
+    """
+    Split a single order into multiple orders based on per-line delivery dates.
+    
+    Returns list of dicts: [{order, lines, delivery_date}, ...]
+    """
+    order = result.get("order", {})
+    lines = result.get("lines", [])
+    
+    # Group lines by delivery date
+    date_groups = {}
+    for line in lines:
+        date_key = line.get("delivery_date") or order.get("requested_delivery_date") or "no_date"
+        if date_key not in date_groups:
+            date_groups[date_key] = []
+        date_groups[date_key].append(line)
+    
+    # If only one group, return as-is
+    if len(date_groups) <= 1:
+        return [{
+            "order": order,
+            "lines": lines,
+            "delivery_date": list(date_groups.keys())[0] if date_groups else None
+        }]
+    
+    # Create separate orders per date
+    split_orders = []
+    for delivery_date in sorted(date_groups.keys()):
+        group_lines = date_groups[delivery_date]
+        order_copy = dict(order)
+        order_copy["requested_delivery_date"] = delivery_date if delivery_date != "no_date" else None
+        split_orders.append({
+            "order": order_copy,
+            "lines": group_lines,
+            "delivery_date": delivery_date if delivery_date != "no_date" else None
+        })
+    
+    logger.info(f"Split order into {len(split_orders)} orders by delivery date")
+    return split_orders
+
+
 def build_workflow() -> StateGraph:
     """Build the LangGraph workflow."""
     workflow = StateGraph(OrderParseState)
@@ -341,8 +382,15 @@ def parse_order(input_data: bytes | str, input_type: str = "text") -> Dict:
     
     final_state = order_parser_workflow.invoke(initial_state)
     
+    # Split orders by delivery date
+    final_result = final_state["final_result"]
+    split_orders = split_orders_by_delivery_date(final_result) if final_result else []
+    has_multiple_dates = len(split_orders) > 1
+    
     return {
-        "result": final_state["final_result"],
+        "result": final_result,
         "warnings": final_state["warnings"],
         "document_type": final_state["document_type"],
+        "split_orders": split_orders,
+        "has_multiple_dates": has_multiple_dates,
     }

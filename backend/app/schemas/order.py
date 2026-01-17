@@ -37,6 +37,7 @@ class OrderLine(BaseModel):
     quantity: Optional[float] = None
     unit_of_measure: Optional[str] = None
     unit_price_excl_vat: Optional[float] = None
+    delivery_date: Optional[str] = None  # Per-line delivery date (YYYY-MM-DD)
 
 
 class Order(BaseModel):

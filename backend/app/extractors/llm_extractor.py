@@ -70,6 +70,7 @@ class ExtractedLine(BaseModel):
     quantity: Optional[float] = Field(None, description="Quantity as number")
     unit_of_measure: Optional[str] = Field(None, description="Unit: KG, TON, UN, L, etc.")
     unit_price_excl_vat: Optional[float] = Field(None, description="Unit price excluding VAT/IVA")
+    delivery_date: Optional[str] = Field(None, description="Per-line delivery date in YYYY-MM-DD format")
 
 
 class ExtractedOrderWithLines(BaseModel):
@@ -154,6 +155,38 @@ If you see a table like:
 Extract as:
 - Line 1: item_reference_no="133510", description="PANBONIS 10", quantity=400, unit="KG", unit_price=44.10
 - Line 2: item_reference_no="133510", description="PANBONIS 10", quantity=600, unit="KG", unit_price=44.10
+
+LAR COOPERATIVA PURCHASE ORDERS (VERY IMPORTANT):
+LAR orders have a SPECIFIC structure you MUST understand:
+- "DADOS DO FORNECEDOR" section = the SUPPLIER (Oligo Basics) - DO NOT use this CNPJ for customer!
+- "ENDERECO DE ENTREGA E FATURAMENTO" section = the CUSTOMER (LAR) - USE THIS CNPJ for customer!
+- Look for "CNPJ:" right after "Local:" to find the CUSTOMER CNPJ
+- The customer name is on the "Local:" line (e.g., "LAR COOPERATIVA AGROINDUSTRIAL - UNIDADE...")
+
+PRODUCTS WITH MULTIPLE DELIVERY SCHEDULES (CRITICAL):
+Some products have delivery schedules BELOW the main product line:
+```
+849339 ESSENTIAL...   22500,00  1 KG  ...  15,0000  ...  337.500,00
+**** DATAS DE ENTREGA  ***
+-QUANTIDADE DE   7500    KG P/ ENTREGA EM  13/02/26
+-QUANTIDADE DE   7500    KG P/ ENTREGA EM  24/02/26
+-QUANTIDADE DE   7500    KG P/ ENTREGA EM  05/03/26
+```
+
+In this case, you MUST create SEPARATE order lines for EACH delivery:
+- Line 1: item_reference_no="849339", description="ESSENTIAL", quantity=7500, unit="KG", unit_price=15.00, delivery_date="2026-02-13"
+- Line 2: item_reference_no="849339", description="ESSENTIAL", quantity=7500, unit="KG", unit_price=15.00, delivery_date="2026-02-24"
+- Line 3: item_reference_no="849339", description="ESSENTIAL", quantity=7500, unit="KG", unit_price=15.00, delivery_date="2026-03-05"
+
+DO NOT use the total quantity (22500) - use the per-delivery quantities!
+The unit price stays the same for all deliveries.
+
+DELIVERY DATES PER PRODUCT LINE:
+- Look for "**** DATAS DE ENTREGA ***" sections below each product
+- Pattern: "-QUANTIDADE DE XXXX KG P/ ENTREGA EM DD/MM/YY"
+- Each such line = a separate order line with that quantity and date
+- Convert dates from DD/MM/YY to YYYY-MM-DD format (assume 20XX for years like 26)
+- If a product has NO delivery schedule below it, use the main header "Data de Entrega" date
 
 If the document is an email, extract order details from the email body or any attached structured data.
 """
@@ -358,6 +391,7 @@ Extract all order information from this document. Remember:
                     "quantity": line.quantity,
                     "unit_of_measure": line.unit_of_measure,
                     "unit_price_excl_vat": line.unit_price_excl_vat,
+                    "delivery_date": line.delivery_date,
                 }
                 for line in extracted.lines
             ]

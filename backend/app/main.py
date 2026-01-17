@@ -53,6 +53,8 @@ class ParseResponseModel(BaseModel):
     lines: list
     warnings: list = []
     document_type: str = "unknown"
+    split_orders: list = []  # Orders split by delivery date
+    has_multiple_dates: bool = False
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -108,6 +110,8 @@ async def parse_order_endpoint(
             lines=parsed_result.get("lines", []),
             warnings=result.get("warnings", []),
             document_type=result.get("document_type", "unknown"),
+            split_orders=result.get("split_orders", []),
+            has_multiple_dates=result.get("has_multiple_dates", False),
         )
         
     except HTTPException:
@@ -144,6 +148,8 @@ async def parse_text_endpoint(request: ParseRequest):
             lines=parsed_result.get("lines", []),
             warnings=result.get("warnings", []),
             document_type=result.get("document_type", "unknown"),
+            split_orders=result.get("split_orders", []),
+            has_multiple_dates=result.get("has_multiple_dates", False),
         )
         
     except Exception as e:
