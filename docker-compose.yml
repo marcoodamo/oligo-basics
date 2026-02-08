@@ -1,19 +1,41 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: parser
+      POSTGRES_USER: parser
+      POSTGRES_PASSWORD: parser
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U parser -d parser"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
       - "8010:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
       - OCR_ENABLED=${OCR_ENABLED:-false}
+      - PARSER_PIPELINE=${PARSER_PIPELINE:-v2}
+      - PARSER_DB_PATH=/app/data/parser_models.db
+      - DATABASE_URL=${DATABASE_URL:-postgresql://parser:parser@postgres:5432/parser}
     volumes:
       - ./backend/config:/app/config:ro
-      - ./data:/app/data:ro
+      - ./data:/app/data
       - ./outputs:/app/outputs
-    restart: unless-stopped
+    restart: always
 
   frontend:
     build:
@@ -21,8 +43,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "5173:5173"
-    environment:
-      - VITE_API_URL=http://localhost:8000
     depends_on:
       - backend
-    restart: unless-stopped
+    restart: always
+
+volumes:
+  postgres_data:

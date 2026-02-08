@@ -15,4 +15,4 @@ COPY . .
 EXPOSE 5173
 
 # Start dev server (for development)
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173", "--strictPort"]

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 
 // API base URL - uses proxy in dev, direct in production
@@ -12,6 +12,33 @@ function App() {
     const [error, setError] = useState(null)
     const [activeTab, setActiveTab] = useState('sections')
     const [selectedOrderIndex, setSelectedOrderIndex] = useState(0)
+    const [view, setView] = useState('parser')
+
+    const [configFile, setConfigFile] = useState(null)
+    const [configText, setConfigText] = useState('')
+    const [configPreview, setConfigPreview] = useState(null)
+    const [configModelName, setConfigModelName] = useState('')
+    const [configDisplayName, setConfigDisplayName] = useState('')
+    const [configDetectionRules, setConfigDetectionRules] = useState('')
+    const [configMappingConfig, setConfigMappingConfig] = useState('')
+    const [configLoading, setConfigLoading] = useState(false)
+    const [configError, setConfigError] = useState(null)
+    const [configSaved, setConfigSaved] = useState(null)
+
+    const [logs, setLogs] = useState([])
+    const [logsLoading, setLogsLoading] = useState(false)
+    const [logsError, setLogsError] = useState(null)
+    const [selectedLog, setSelectedLog] = useState(null)
+    const [documentDetail, setDocumentDetail] = useState(null)
+    const [documentError, setDocumentError] = useState(null)
+    const [logFilters, setLogFilters] = useState({
+        status: '',
+        model: '',
+        company: '',
+        filename: '',
+        date_from: '',
+        date_to: '',
+    })
 
     // Dropzone configuration
     const onDrop = useCallback((acceptedFiles) => {
@@ -24,6 +51,20 @@ function App() {
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
+        accept: { 'application/pdf': ['.pdf'] },
+        multiple: false,
+    })
+
+    const onDropConfigurator = useCallback((acceptedFiles) => {
+        if (acceptedFiles.length > 0) {
+            setConfigFile(acceptedFiles[0])
+            setConfigText('')
+            setConfigError(null)
+        }
+    }, [])
+
+    const configDropzone = useDropzone({
+        onDrop: onDropConfigurator,
         accept: { 'application/pdf': ['.pdf'] },
         multiple: false,
     })
@@ -116,6 +157,171 @@ function App() {
         setSelectedOrderIndex(0)
     }
 
+    const handlePreviewConfigurator = async () => {
+        if (!configFile && !configText.trim()) {
+            setConfigError('Envie um PDF ou cole o texto do pedido')
+            return
+        }
+
+        setConfigLoading(true)
+        setConfigError(null)
+        setConfigPreview(null)
+        setConfigSaved(null)
+
+        try {
+            let response
+
+            if (configFile) {
+                const formData = new FormData()
+                formData.append('file', configFile)
+                response = await fetch(`${API_BASE}/models/preview`, {
+                    method: 'POST',
+                    body: formData,
+                })
+            } else {
+                const formData = new FormData()
+                formData.append('text', configText)
+                response = await fetch(`${API_BASE}/models/preview`, {
+                    method: 'POST',
+                    body: formData,
+                })
+            }
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Erro: ${response.status}`)
+            }
+
+            const data = await response.json()
+            setConfigPreview(data)
+            setConfigModelName(data.suggested_model_name || '')
+            setConfigDisplayName(data.suggested_display_name || '')
+
+            const suggestedRules = {
+                keywords: data.suggested_display_name
+                    ? data.suggested_display_name.toLowerCase().split(' ').filter(Boolean)
+                    : [],
+                customer_names: data.suggested_display_name ? [data.suggested_display_name] : [],
+                customer_cnpjs: [],
+                header_regex: [],
+                required_fields: ['cnpj', 'pedido'],
+            }
+
+            const defaultMapping = {
+                fields: [
+                    { source: 'order.customer_order_number', target: 'order.order_number' },
+                    { source: 'order.order_date', target: 'order.issue_date' },
+                    { source: 'order.requested_delivery_date', target: 'order.delivery_date' },
+                    { source: 'order.payment_terms_code', target: 'order.payment_terms' },
+                ],
+                item_fields: [
+                    { source: 'lines[].item_reference_no', target: 'items[].sku' },
+                    { source: 'lines[].description', target: 'items[].description' },
+                    { source: 'lines[].quantity', target: 'items[].quantity' },
+                    { source: 'lines[].unit_of_measure', target: 'items[].unit' },
+                    { source: 'lines[].unit_price_excl_vat', target: 'items[].unit_price' },
+                ],
+            }
+
+            setConfigDetectionRules(JSON.stringify(suggestedRules, null, 2))
+            setConfigMappingConfig(JSON.stringify(defaultMapping, null, 2))
+        } catch (err) {
+            setConfigError(err.message || 'Erro ao gerar preview')
+        } finally {
+            setConfigLoading(false)
+        }
+    }
+
+    const handleSaveModel = async () => {
+        if (!configModelName) {
+            setConfigError('Informe um nome para o modelo')
+            return
+        }
+        try {
+            const detectionRules = configDetectionRules ? JSON.parse(configDetectionRules) : {}
+            const mappingConfig = configMappingConfig ? JSON.parse(configMappingConfig) : {}
+            const payload = {
+                name: configModelName,
+                display_name: configDisplayName || configModelName,
+                detection_rules: detectionRules,
+                mapping_config: mappingConfig,
+                examples: configFile ? [configFile.name] : undefined,
+            }
+
+            const response = await fetch(`${API_BASE}/models`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Erro: ${response.status}`)
+            }
+
+            const data = await response.json()
+            setConfigSaved(data)
+        } catch (err) {
+            setConfigError(err.message || 'Erro ao salvar modelo')
+        }
+    }
+
+    const fetchLogs = async () => {
+        setLogsLoading(true)
+        setLogsError(null)
+        try {
+            const params = new URLSearchParams()
+            if (logFilters.status) params.append('status', logFilters.status)
+            if (logFilters.model) params.append('model', logFilters.model)
+            if (logFilters.company) params.append('company', logFilters.company)
+            if (logFilters.filename) params.append('filename', logFilters.filename)
+            if (logFilters.date_from) params.append('date_from', logFilters.date_from)
+            if (logFilters.date_to) params.append('date_to', logFilters.date_to)
+            const response = await fetch(`${API_BASE}/logs?${params.toString()}`)
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Erro: ${response.status}`)
+            }
+            const data = await response.json()
+            setLogs(data)
+            setSelectedLog(data[0] || null)
+        } catch (err) {
+            setLogsError(err.message || 'Erro ao carregar logs')
+        } finally {
+            setLogsLoading(false)
+        }
+    }
+
+    const fetchDocumentDetail = async (documentId) => {
+        if (!documentId) return
+        setDocumentError(null)
+        try {
+            const response = await fetch(`${API_BASE}/documents/${documentId}/parsed`)
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}))
+                throw new Error(errorData.detail || `Erro: ${response.status}`)
+            }
+            const data = await response.json()
+            setDocumentDetail(data)
+        } catch (err) {
+            setDocumentError(err.message || 'Erro ao carregar documento')
+        }
+    }
+
+    useEffect(() => {
+        if (view === 'audit') {
+            fetchLogs()
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [view, logFilters])
+
+    useEffect(() => {
+        if (view === 'audit' && selectedLog?.document_id) {
+            fetchDocumentDetail(selectedLog.document_id)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedLog])
+
     // Get current display data based on selection
     const displayOrder = result?.has_multiple_dates
         ? result.split_orders[selectedOrderIndex]?.order
@@ -133,8 +339,308 @@ function App() {
                     <p>Extração automática de dados para Business Central</p>
                 </header>
 
-                <main className="main-content">
-                    {/* Input Panel */}
+                <div className="tab-switch">
+                    <button
+                        className={`btn ${view === 'parser' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setView('parser')}
+                    >
+                        Parser
+                    </button>
+                    <button
+                        className={`btn ${view === 'configurator' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setView('configurator')}
+                    >
+                        Configurador
+                    </button>
+                    <button
+                        className={`btn ${view === 'audit' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setView('audit')}
+                    >
+                        Auditoria
+                    </button>
+                </div>
+
+                <main className={`main-content ${view !== 'parser' ? 'single' : ''}`}>
+                    {view === 'configurator' && (
+                        <div className="card">
+                            <div className="card-header">
+                                <svg className="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M12 1v22" />
+                                    <path d="M5 5h14v14H5z" />
+                                </svg>
+                                <h2>Novo Modelo</h2>
+                            </div>
+
+                            <div
+                                {...configDropzone.getRootProps()}
+                                className={`dropzone ${configDropzone.isDragActive ? 'active' : ''}`}
+                            >
+                                <input {...configDropzone.getInputProps()} />
+                                <svg className="dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17,8 12,3 7,8" />
+                                    <line x1="12" y1="3" x2="12" y2="15" />
+                                </svg>
+                                <p>Arraste o PDF para gerar preview</p>
+                                <span className="hint">ou clique para selecionar</span>
+
+                                {configFile && (
+                                    <div className="file-info">
+                                        📄 {configFile.name} ({(configFile.size / 1024).toFixed(1)} KB)
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="divider">ou</div>
+
+                            <div className="textarea-container">
+                                <label htmlFor="config-text">Cole o texto do pedido</label>
+                                <textarea
+                                    id="config-text"
+                                    className="textarea"
+                                    value={configText}
+                                    onChange={(e) => {
+                                        setConfigText(e.target.value)
+                                        setConfigFile(null)
+                                    }}
+                                    placeholder="Cole o texto para gerar preview e sugerir modelo"
+                                />
+                            </div>
+
+                            {configError && (
+                                <div className="warning-item" style={{ marginTop: 'var(--space-md)', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--error)' }}>
+                                    <svg className="warning-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="8" x2="12" y2="12" />
+                                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                                    </svg>
+                                    {configError}
+                                </div>
+                            )}
+
+                            <button
+                                className="btn btn-primary btn-block"
+                                onClick={handlePreviewConfigurator}
+                                disabled={configLoading}
+                            >
+                                {configLoading ? 'Gerando preview...' : 'Gerar Preview'}
+                            </button>
+
+                            {configPreview && (
+                                <div className="config-section">
+                                    <div className="info-box">
+                                        <strong>Detecção:</strong> {configPreview.detected.model_name} (
+                                        {(configPreview.detected.confidence * 100).toFixed(0)}%)
+                                    </div>
+
+                                    <div className="form-grid">
+                                        <div className="form-field">
+                                            <label>Nome do modelo</label>
+                                            <input
+                                                value={configModelName}
+                                                onChange={(e) => setConfigModelName(e.target.value)}
+                                                placeholder="lar, brf, custom-..."
+                                            />
+                                        </div>
+                                        <div className="form-field">
+                                            <label>Nome exibido</label>
+                                            <input
+                                                value={configDisplayName}
+                                                onChange={(e) => setConfigDisplayName(e.target.value)}
+                                                placeholder="Razão social do cliente"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label>Regras de detecção (JSON)</label>
+                                        <textarea
+                                            className="textarea textarea-small"
+                                            value={configDetectionRules}
+                                            onChange={(e) => setConfigDetectionRules(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label>Mapeamento (JSON)</label>
+                                        <textarea
+                                            className="textarea textarea-small"
+                                            value={configMappingConfig}
+                                            onChange={(e) => setConfigMappingConfig(e.target.value)}
+                                        />
+                                    </div>
+
+                                    <div className="form-field">
+                                        <label>Preview canônico</label>
+                                        <pre className="json-preview">
+                                            {JSON.stringify(configPreview.preview, null, 2)}
+                                        </pre>
+                                    </div>
+
+                                    <button className="btn btn-secondary btn-block" onClick={handleSaveModel}>
+                                        Salvar Modelo
+                                    </button>
+
+                                    {configSaved && (
+                                        <div className="info-box success">
+                                            Modelo salvo: {configSaved.name} ({configSaved.current_version.version})
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {view === 'audit' && (
+                        <div className="card">
+                            <div className="card-header">
+                                <svg className="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <path d="M9 12h6" />
+                                    <path d="M9 16h6" />
+                                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                                    <path d="M9 4V2" />
+                                    <path d="M15 4V2" />
+                                </svg>
+                                <h2>Auditoria</h2>
+                            </div>
+
+                            <div className="audit-filters">
+                                <input
+                                    placeholder="Modelo"
+                                    value={logFilters.model}
+                                    onChange={(e) => setLogFilters({ ...logFilters, model: e.target.value })}
+                                />
+                                <input
+                                    placeholder="Empresa"
+                                    value={logFilters.company}
+                                    onChange={(e) => setLogFilters({ ...logFilters, company: e.target.value })}
+                                />
+                                <input
+                                    placeholder="Arquivo"
+                                    value={logFilters.filename}
+                                    onChange={(e) => setLogFilters({ ...logFilters, filename: e.target.value })}
+                                />
+                                <select
+                                    value={logFilters.status}
+                                    onChange={(e) => setLogFilters({ ...logFilters, status: e.target.value })}
+                                >
+                                    <option value="">Status</option>
+                                    <option value="success">success</option>
+                                    <option value="partial">partial</option>
+                                    <option value="failed">failed</option>
+                                </select>
+                                <input
+                                    type="date"
+                                    value={logFilters.date_from}
+                                    onChange={(e) => setLogFilters({ ...logFilters, date_from: e.target.value })}
+                                />
+                                <input
+                                    type="date"
+                                    value={logFilters.date_to}
+                                    onChange={(e) => setLogFilters({ ...logFilters, date_to: e.target.value })}
+                                />
+                                <button className="btn btn-secondary" onClick={fetchLogs} disabled={logsLoading}>
+                                    Filtrar
+                                </button>
+                            </div>
+
+                            {logsError && (
+                                <div className="warning-item" style={{ marginTop: 'var(--space-md)', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--error)' }}>
+                                    {logsError}
+                                </div>
+                            )}
+
+                            <div className="audit-grid">
+                                <div className="audit-table">
+                                    {logsLoading ? (
+                                        <div className="empty-state">Carregando...</div>
+                                    ) : logs.length === 0 ? (
+                                        <div className="empty-state">Nenhum log encontrado.</div>
+                                    ) : (
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Início</th>
+                                                    <th>Modelo</th>
+                                                    <th>Status</th>
+                                                    <th>Empresa</th>
+                                                    <th>Arquivo</th>
+                                                    <th>Duração (ms)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {logs.map((log) => (
+                                                    <tr key={log.id} onClick={() => setSelectedLog(log)}>
+                                                        <td>{log.started_at || '-'}</td>
+                                                        <td>{log.model_name || '-'}</td>
+                                                        <td className={`status ${log.status}`}>{log.status || '-'}</td>
+                                                        <td>{log.company_name || '-'}</td>
+                                                        <td>{log.filename || '-'}</td>
+                                                        <td>{log.duration_ms ?? '-'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                </div>
+
+                                <div className="audit-detail">
+                                    {selectedLog ? (
+                                        <>
+                                            <div className="info-box">
+                                                <strong>Status:</strong> {selectedLog.status || '-'} ·{' '}
+                                                <strong>Modelo:</strong> {selectedLog.model_name || '-'} ·{' '}
+                                                <strong>Confiança:</strong> {selectedLog.model_confidence ?? '-'}
+                                            </div>
+
+                                            {documentError && (
+                                                <div className="warning-item" style={{ marginTop: 'var(--space-md)', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--error)' }}>
+                                                    {documentError}
+                                                </div>
+                                            )}
+
+                                            {documentDetail ? (
+                                                <>
+                                                    <details className="json-collapsible" open>
+                                                        <summary>JSON canônico</summary>
+                                                        <pre className="json-preview">
+                                                            {JSON.stringify(documentDetail, null, 2)}
+                                                        </pre>
+                                                    </details>
+                                                    <details className="json-collapsible">
+                                                        <summary>Warnings</summary>
+                                                        <pre className="json-preview">
+                                                            {JSON.stringify(documentDetail.parsing?.warnings || [], null, 2)}
+                                                        </pre>
+                                                    </details>
+                                                    <details className="json-collapsible">
+                                                        <summary>Missing fields</summary>
+                                                        <pre className="json-preview">
+                                                            {JSON.stringify(documentDetail.parsing?.missing_fields || [], null, 2)}
+                                                        </pre>
+                                                    </details>
+                                                    <a
+                                                        className="btn btn-secondary btn-block"
+                                                        href={`${API_BASE}/documents/${selectedLog.document_id}/parsed/download`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                    >
+                                                        Baixar JSON
+                                                    </a>
+                                                </>
+                                            ) : (
+                                                <div className="empty-state">Carregando documento...</div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div className="empty-state">Selecione um log para ver detalhes.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {view === 'parser' && (
                     <div className="card">
                         <div className="card-header">
                             <svg className="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -225,8 +731,9 @@ function App() {
                             </button>
                         )}
                     </div>
+                    )}
 
-                    {/* Results Panel */}
+                    {view === 'parser' && (
                     <div className="card results-panel">
                         <div className="card-header">
                             <svg className="card-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -362,6 +869,7 @@ function App() {
                             </div>
                         )}
                     </div>
+                    )}
                 </main>
             </div >
         </div >
@@ -478,6 +986,7 @@ function LinesSection({ lines }) {
                             <th>Descrição</th>
                             <th>Qtd</th>
                             <th>Unid</th>
+                            <th>Entrega</th>
                             <th>Preço Unit.</th>
                         </tr>
                     </thead>
@@ -489,6 +998,7 @@ function LinesSection({ lines }) {
                                 <td className={!line.description ? 'null' : ''}>{line.description || 'null'}</td>
                                 <td className={line.quantity === null ? 'null' : ''}>{line.quantity ?? 'null'}</td>
                                 <td className={!line.unit_of_measure ? 'null' : ''}>{line.unit_of_measure || 'null'}</td>
+                                <td className={!line.delivery_date ? 'null' : ''}>{line.delivery_date || 'null'}</td>
                                 <td className={line.unit_price_excl_vat === null ? 'null' : ''}>
                                     {line.unit_price_excl_vat !== null ? formatCurrency(line.unit_price_excl_vat) : 'null'}
                                 </td>

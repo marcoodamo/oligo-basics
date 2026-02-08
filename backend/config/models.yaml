@@ -1,0 +1,45 @@
+models:
+  - id: generic
+    label: Generic
+    version: "1.0"
+    status: active
+    parser: legacy_workflow
+    normalizer: canonical_v1
+    detection:
+      fallback: true
+
+  - id: lar
+    label: LAR Cooperativa
+    version: "1.0"
+    status: active
+    parser: lar_parser
+    normalizer: canonical_v1
+    detection:
+      keywords:
+        - "lar cooperativa"
+        - "lar agroindustrial"
+      customer_names:
+        - "LAR COOPERATIVA"
+        - "LAR AGROINDUSTRIAL"
+      header_regex:
+        - "^\\s*lar\\s+cooperativa"
+      customer_cnpjs:
+        - "77752293007010"
+        - "77752293014903"
+        - "77752293015381"
+        - "77752293017406"
+
+  - id: brf
+    label: BRF
+    version: "1.0"
+    status: inactive
+    parser: brf_parser
+    normalizer: canonical_v1
+    detection:
+      keywords:
+        - "brf"
+      customer_names:
+        - "BRF"
+      header_regex:
+        - "^\\s*brf"
+      customer_cnpjs: []
