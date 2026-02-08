@@ -1,0 +1,60 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: oligoforms-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oligoforms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oligoforms_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-oligoforms}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oligoforms} -d ${POSTGRES_DB:-oligoforms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: oligoforms-web
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oligoforms}:${POSTGRES_PASSWORD:-oligoforms_secret}@db:5432/${POSTGRES_DB:-oligoforms}?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:-oligo-forms-secret-key-change-in-production-2026}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database migrations (runs once)
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    container_name: oligoforms-migrate
+    restart: on-failure
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oligoforms}:${POSTGRES_PASSWORD:-oligoforms_secret}@db:5432/${POSTGRES_DB:-oligoforms}?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

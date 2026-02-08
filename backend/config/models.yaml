@@ -32,7 +32,7 @@ models:
   - id: brf
     label: BRF
     version: "1.0"
-    status: inactive
+    status: active
     parser: brf_parser
     normalizer: canonical_v1
     detection:

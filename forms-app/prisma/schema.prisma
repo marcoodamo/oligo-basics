@@ -1,0 +1,201 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User & Organization Models
+// ============================================
+
+enum UserRole {
+  ADMIN
+  USER
+  VENDOR
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  users       User[]
+  forms       Form[]
+  vendors     Vendor[]
+  salesOrders SalesOrder[]
+}
+
+model User {
+  id             String       @id @default(cuid())
+  name           String?
+  email          String       @unique
+  passwordHash   String
+  role           UserRole     @default(USER)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+}
+
+// ============================================
+// Forms Module Models
+// ============================================
+
+enum FormStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Form {
+  id             String       @id @default(cuid())
+  title          String
+  description    String?
+  status         FormStatus   @default(DRAFT)
+  publicSlug     String       @unique
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  fields         Json
+  settings       Json?
+
+  emailNotifications Boolean @default(false)
+  notifyEmail        String?
+
+  submissions Submission[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Submission {
+  id        String   @id @default(cuid())
+  formId    String
+  form      Form     @relation(fields: [formId], references: [id])
+  data      Json
+  createdAt DateTime @default(now())
+}
+
+// ============================================
+// Parser Module Models
+// ============================================
+
+model ParserProcessing {
+  id              String   @id @default(uuid())
+  filename        String
+  fileSize        Int
+  status          String   @default("processing") // processing, success, failed
+  documentType    String?
+  orderNumber     String?
+  customerName    String?
+  itemCount       Int      @default(0)
+  warningCount    Int      @default(0)
+  resultJson      Json
+  warnings        String[]
+  processingTime  Int?     // milliseconds
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ============================================
+// Vendor Module Models
+// ============================================
+
+model Vendor {
+  id             String       @id @default(cuid())
+  name           String
+  email          String       @unique
+  passwordHash   String
+  phone          String?
+  active         Boolean      @default(true)
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  salesOrders    SalesOrder[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model SalesOrder {
+  id                    String           @id @default(cuid())
+  vendorId              String
+  vendor                Vendor           @relation(fields: [vendorId], references: [id])
+  organizationId        String
+  organization          Organization     @relation(fields: [organizationId], references: [id])
+  status                SalesOrderStatus @default(DRAFT)
+
+  // Seção 1: Dados do Pedido
+  customerOrderNumber   String
+  orderDate             DateTime
+  requestedDeliveryDate DateTime
+  promisedDeliveryDate  DateTime?
+  invoiceDate           DateTime?
+
+  // Seção 2: Cliente (Sell-To)
+  customerName          String
+  customerCnpj          String
+  customerIe            String?
+  customerPhone         String?
+  customerEmail         String?
+  customerContact       String?
+
+  // Seção 3: Endereço Cobrança (Bill-To)
+  billToStreet          String
+  billToNumber          String
+  billToComplement      String?
+  billToDistrict        String
+  billToCity            String
+  billToState           String
+  billToZip             String
+  billToCountry         String           @default("Brasil")
+
+  // Seção 4: Endereço Entrega (Ship-To)
+  sameAsBillTo          Boolean          @default(true)
+  shipToStreet          String?
+  shipToNumber          String?
+  shipToComplement      String?
+  shipToDistrict        String?
+  shipToCity            String?
+  shipToState           String?
+  shipToZip             String?
+  shipToCountry         String?
+
+  // Seção 5: Itens do Pedido (JSON array)
+  items                 Json             // Array of SalesOrderItem
+
+  // Seção 6: Condições de Pagamento
+  paymentTermDays       Int
+  paymentDaysOfMonth    String?          // Ex: "05,20"
+  paymentMethod         String?          // DEPOSIT, BOLETO, PIX, OTHER
+  subtotal              Decimal?
+  discounts             Decimal?
+  freight               Decimal?
+  taxes                 Decimal?
+  total                 Decimal?
+
+  // Seção 7: Dados Financeiros
+  currency              String           @default("BRL")
+  bankAccountCode       String?
+  viaDeposit            Boolean          @default(false)
+
+  // Seção 8: Frete e Entrega
+  freightMode           String           // CIF, FOB
+  carrier               String?
+  deliveryInstructions  String?
+
+  // Seção 9: Observações
+  notes                 String?
+
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}

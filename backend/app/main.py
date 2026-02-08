@@ -109,6 +109,9 @@ def run_parser_legacy(input_data: bytes | str, input_type: str, source_name: str
     try:
         if detection and detection.model_id == "lar":
             result = LarParser().parse(parse_context).raw or {}
+        elif detection and detection.model_id == "brf":
+            from app.pipeline.parsers import BrfParser
+            result = BrfParser().parse(parse_context).raw or {}
         else:
             result = parse_order(input_data, input_type=input_type)
         warnings = result.get("warnings", []) if isinstance(result, dict) else []
