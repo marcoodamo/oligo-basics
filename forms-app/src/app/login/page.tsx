@@ -1,63 +1,22 @@
 "use client";
 
-import { useState, Suspense } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, Suspense, useActionState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
+import { loginAction, type LoginState } from "./actions";
 
 function LoginForm() {
-    const router = useRouter();
     const searchParams = useSearchParams();
-    const rawCallback = searchParams.get("callbackUrl") || "/dashboard";
-    const callbackUrl = rawCallback === "/" ? "/dashboard" : rawCallback;
+    const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
 
-    const [isLoading, setIsLoading] = useState(false);
-
-    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-        e.preventDefault();
-        setIsLoading(true);
-
-        const formData = new FormData(e.currentTarget);
-        const email = formData.get('email') as string;
-        const password = formData.get('password') as string;
-
-        if (!email || !password) {
-            toast.error("Por favor, preencha todos os campos");
-            setIsLoading(false);
-            return;
-        }
-
-        try {
-            console.log('[LOGIN] Attempting login with:', email);
-            const result = await signIn("credentials", {
-                email,
-                password,
-                redirect: false,
-            });
-
-            console.log('[LOGIN] Result:', result);
-
-            if (result?.error) {
-                console.error('[LOGIN] Error:', result.error);
-                toast.error("Email ou senha inválidos");
-            } else {
-                toast.success("Login realizado com sucesso!");
-                console.log('[LOGIN] Success, refreshing and redirecting to:', callbackUrl);
-                router.refresh(); // Update server components
-                router.replace(callbackUrl); // Use replace to prevent back button loop
-            }
-        } catch (error) {
-            console.error('[LOGIN] Exception:', error);
-            toast.error("Erro ao fazer login. Tente novamente.");
-        } finally {
-            setIsLoading(false);
-        }
-    }
+    const [state, formAction, isPending] = useActionState<LoginState, FormData>(
+        loginAction,
+        {}
+    );
 
     return (
         <Card className="w-full max-w-md">
@@ -78,7 +37,15 @@ function LoginForm() {
                 </div>
             </CardHeader>
             <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form action={formAction} className="space-y-4">
+                    <input type="hidden" name="redirectTo" value={callbackUrl} />
+
+                    {state.error && (
+                        <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
+                            {state.error}
+                        </div>
+                    )}
+
                     <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
                         <Input
@@ -87,7 +54,7 @@ function LoginForm() {
                             type="email"
                             placeholder="seu@email.com"
                             required
-                            disabled={isLoading}
+                            disabled={isPending}
                             autoComplete="email"
                         />
                     </div>
@@ -99,12 +66,12 @@ function LoginForm() {
                             type="password"
                             placeholder="••••••••"
                             required
-                            disabled={isLoading}
+                            disabled={isPending}
                             autoComplete="current-password"
                         />
                     </div>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
-                        {isLoading ? "Entrando..." : "Entrar"}
+                    <Button type="submit" className="w-full" disabled={isPending}>
+                        {isPending ? "Entrando..." : "Entrar"}
                     </Button>
                 </form>
             </CardContent>

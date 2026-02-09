@@ -19,6 +19,9 @@ export function Sidebar() {
     const pathname = usePathname();
     const { data: session } = useSession();
 
+    console.log("[SIDEBAR] Session:", JSON.stringify(session));
+    console.log("[SIDEBAR] User role:", session?.user?.role);
+
     return (
         <div className="flex h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
             {/* Logo */}

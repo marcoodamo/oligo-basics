@@ -37,7 +37,8 @@ import {
 } from "@/modules/parser/actions/parser-actions";
 import type { ParserProcessingItem } from "@/modules/parser/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_PARSER_API_URL || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_PARSER_API_URL || "";
+console.log("[PARSER] API_BASE:", API_BASE);
 
 interface OrderData {
     customer_order_number?: string;
@@ -313,8 +314,8 @@ export default function ParserPage() {
                     <CardContent className="space-y-4">
                         <div
                             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${isDragOver
-                                    ? "border-primary bg-primary/5"
-                                    : "border-muted-foreground/25 hover:border-primary/50"
+                                ? "border-primary bg-primary/5"
+                                : "border-muted-foreground/25 hover:border-primary/50"
                                 }`}
                             onDragOver={(e) => {
                                 e.preventDefault();
@@ -455,8 +456,8 @@ export default function ParserPage() {
                                         <button
                                             key={tab}
                                             className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${activeTab === tab
-                                                    ? "border-primary text-primary"
-                                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                                                ? "border-primary text-primary"
+                                                : "border-transparent text-muted-foreground hover:text-foreground"
                                                 }`}
                                             onClick={() => setActiveTab(tab)}
                                         >

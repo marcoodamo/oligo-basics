@@ -1,0 +1,72 @@
+services:
+  # PostgreSQL Database - Internal only, no external port exposure
+  db:
+    image: postgres:16-alpine
+    container_name: oligoforms-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-oligoforms}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oligoforms_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-oligoforms}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - oligoforms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oligoforms} -d ${POSTGRES_DB:-oligoforms}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Web Application - Exposed on port 3000 for nginx proxy
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_PARSER_API_URL=https://oligo.fleriz.com/api
+    container_name: oligoforms-web
+    restart: always
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oligoforms}:${POSTGRES_PASSWORD:-oligoforms_secret}@db:5432/${POSTGRES_DB:-oligoforms}?schema=public
+      AUTH_SECRET: ${AUTH_SECRET:-oligo-forms-secret-key-change-in-production-2026}
+      AUTH_URL: ${AUTH_URL:-https://oligo.fleriz.com}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://oligo.fleriz.com}
+      AUTH_TRUST_HOST: "true"
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://oligo.fleriz.com}
+      NEXT_PUBLIC_PARSER_API_URL: ${NEXT_PUBLIC_PARSER_API_URL:-https://oligo.fleriz.com/api}
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    networks:
+      - oligoforms-network
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Database migrations (runs once)
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrate
+    container_name: oligoforms-migrate
+    restart: "no"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-oligoforms}:${POSTGRES_PASSWORD:-oligoforms_secret}@db:5432/${POSTGRES_DB:-oligoforms}?schema=public
+    networks:
+      - oligoforms-network
+    depends_on:
+      db:
+        condition: service_healthy
+
+networks:
+  oligoforms-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
