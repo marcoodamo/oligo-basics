@@ -57,3 +57,22 @@ export async function getSalesOrderById(id: string) {
 
     return order;
 }
+
+export async function deleteAdminSalesOrder(id: string): Promise<{ success: boolean; error?: string }> {
+    const session = await auth();
+
+    if (!session?.user || session.user.role !== 'ADMIN') {
+        return { success: false, error: 'Não autorizado' };
+    }
+
+    try {
+        await prisma.salesOrder.delete({
+            where: { id },
+        });
+
+        return { success: true };
+    } catch (error) {
+        console.error('Erro ao excluir pedido:', error);
+        return { success: false, error: 'Erro ao excluir pedido' };
+    }
+}

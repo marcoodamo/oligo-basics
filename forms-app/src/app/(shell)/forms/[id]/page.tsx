@@ -22,7 +22,11 @@ export default async function FormEditorPage({ params }: PageProps) {
         notFound();
     }
 
-    const submissions = await getFormSubmissions(id);
+    const rawSubmissions = await getFormSubmissions(id);
+    const submissions = rawSubmissions.map((s) => ({
+        ...s,
+        data: (s.data as Record<string, any>) ?? {},
+    }));
     const fields = (form.fields as unknown as FormField[]) || [];
     const settings = (form.settings as unknown as FormSettingsType) || {};
 

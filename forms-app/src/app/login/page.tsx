@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -13,11 +13,12 @@ import { toast } from "sonner";
 function LoginForm() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+    const rawCallback = searchParams.get("callbackUrl") || "/dashboard";
+    const callbackUrl = rawCallback === "/" ? "/dashboard" : rawCallback;
 
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setIsLoading(true);
 
@@ -32,27 +33,31 @@ function LoginForm() {
         }
 
         try {
+            console.log('[LOGIN] Attempting login with:', email);
             const result = await signIn("credentials", {
                 email,
                 password,
                 redirect: false,
-                callbackUrl,
             });
 
+            console.log('[LOGIN] Result:', result);
+
             if (result?.error) {
+                console.error('[LOGIN] Error:', result.error);
                 toast.error("Email ou senha inválidos");
-            } else if (result?.ok) {
+            } else {
                 toast.success("Login realizado com sucesso!");
-                router.push(callbackUrl);
-                router.refresh();
+                console.log('[LOGIN] Success, refreshing and redirecting to:', callbackUrl);
+                router.refresh(); // Update server components
+                router.replace(callbackUrl); // Use replace to prevent back button loop
             }
         } catch (error) {
-            console.error("[LOGIN] Exception:", error);
-            toast.error("Erro ao fazer login");
+            console.error('[LOGIN] Exception:', error);
+            toast.error("Erro ao fazer login. Tente novamente.");
         } finally {
             setIsLoading(false);
         }
-    };
+    }
 
     return (
         <Card className="w-full max-w-md">

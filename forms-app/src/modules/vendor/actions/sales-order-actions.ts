@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
+import type { Prisma } from '@prisma/client';
 import type {
     SalesOrderListItem,
     SalesOrderDetail,
@@ -83,7 +84,7 @@ export async function createSalesOrder(input: CreateSalesOrderInput): Promise<st
             shipToCountry: input.shipToCountry,
 
             // Seção 5
-            items: input.items,
+            items: input.items as unknown as Prisma.InputJsonValue,
 
             // Seção 6
             paymentTermDays: input.paymentTermDays,
@@ -172,7 +173,7 @@ export async function updateSalesOrder(id: string, input: CreateSalesOrderInput)
             shipToCountry: input.shipToCountry,
 
             // Seção 5
-            items: input.items,
+            items: input.items as unknown as Prisma.InputJsonValue,
 
             // Seção 6
             paymentTermDays: input.paymentTermDays,
@@ -220,7 +221,7 @@ export async function listSalesOrders(): Promise<SalesOrderListItem[]> {
         requestedDeliveryDate: order.requestedDeliveryDate,
         status: order.status as SalesOrderListItem['status'],
         total: order.total ? Number(order.total) : null,
-        itemCount: (order.items as SalesOrderItem[]).length,
+        itemCount: (order.items as unknown as SalesOrderItem[]).length,
         createdAt: order.createdAt,
     }));
 }
@@ -276,7 +277,7 @@ export async function getSalesOrderById(id: string): Promise<SalesOrderDetail | 
         shipToZip: order.shipToZip,
         shipToCountry: order.shipToCountry,
 
-        items: order.items as SalesOrderItem[],
+        items: order.items as unknown as SalesOrderItem[],
 
         paymentTermDays: order.paymentTermDays,
         paymentDaysOfMonth: order.paymentDaysOfMonth,

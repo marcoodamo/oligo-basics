@@ -3,6 +3,8 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache openssl
+
 # Copy package files
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
@@ -16,6 +18,10 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# Build args for Next.js public env vars (must be set at build time)
+ARG NEXT_PUBLIC_PARSER_API_URL=http://localhost:8010
+ENV NEXT_PUBLIC_PARSER_API_URL=$NEXT_PUBLIC_PARSER_API_URL
+
 # Build Next.js
 RUN npm run build
 
@@ -23,6 +29,8 @@ RUN npm run build
 FROM node:20-alpine AS runner
 
 WORKDIR /app
+
+RUN apk add --no-cache openssl
 
 ENV NODE_ENV=production
 

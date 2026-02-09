@@ -1,5 +1,10 @@
 // Types for Vendor Module
 
+export interface VendorLoginInput {
+    email: string;
+    password: string;
+}
+
 export interface VendorItem {
     id: string;
     name: string;

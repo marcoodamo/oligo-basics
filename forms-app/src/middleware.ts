@@ -4,12 +4,11 @@ import { getToken } from "next-auth/jwt";
 
 export default async function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
-    const forwardedProto = req.headers.get("x-forwarded-proto");
-    const secureCookie = forwardedProto === "https" || process.env.NODE_ENV === "production";
+
+    // Usar as mesmas configurações que o NextAuth usa internamente
     const token = await getToken({
         req,
         secret: process.env.AUTH_SECRET,
-        secureCookie,
     });
 
     // Rotas públicas que não precisam de autenticação
@@ -36,14 +35,6 @@ export default async function middleware(req: NextRequest) {
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         * - api routes (handled separately)
-         * - public folder
-         */
         "/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
     ],
 };

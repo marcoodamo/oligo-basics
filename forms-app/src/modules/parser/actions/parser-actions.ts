@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import type { Prisma } from "@prisma/client";
 
 interface ParseResult {
     order: any;
@@ -28,7 +29,7 @@ export async function saveParserProcessing(
             customerName: result.order?.sell_to?.name || result.order?.customer_name || null,
             itemCount: result.lines?.length || 0,
             warningCount: result.warnings?.length || 0,
-            resultJson: result,
+            resultJson: result as unknown as Prisma.InputJsonValue,
             warnings: result.warnings || [],
             processingTime,
         },

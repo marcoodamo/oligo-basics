@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { NextAuthConfig } from "next-auth";
+import type { UserRole } from "@prisma/client";
 
 const authConfig: NextAuthConfig = {
     providers: [
@@ -14,14 +15,18 @@ const authConfig: NextAuthConfig = {
                 const email = credentials?.email as string;
                 const password = credentials?.password as string;
 
+                console.log("[AUTH] Starting authorization...");
+
                 if (!email || !password) {
+                    console.log("[AUTH] Missing email or password");
                     return null;
                 }
 
                 try {
-                    // Dynamic imports to avoid build issues
                     const { prisma } = await import("./prisma");
                     const bcrypt = await import("bcryptjs");
+
+                    console.log("[AUTH] Looking for user:", email);
 
                     const user = await prisma.user.findUnique({
                         where: { email },
@@ -29,18 +34,26 @@ const authConfig: NextAuthConfig = {
                     });
 
                     if (!user) {
+                        console.log("[AUTH] User not found");
                         return null;
                     }
 
                     if (user.deletedAt) {
+                        console.log("[AUTH] User is deleted");
                         return null;
                     }
+
+                    console.log("[AUTH] User found:", user.id);
 
                     const isValid = await bcrypt.compare(password, user.passwordHash);
+                    console.log("[AUTH] Password valid:", isValid);
 
                     if (!isValid) {
+                        console.log("[AUTH] Invalid password");
                         return null;
                     }
+
+                    console.log("[AUTH] Login successful!");
 
                     return {
                         id: user.id,
@@ -68,7 +81,7 @@ const authConfig: NextAuthConfig = {
         async session({ session, token }) {
             if (session.user) {
                 session.user.id = token.id as string;
-                session.user.role = token.role as string;
+                session.user.role = token.role as UserRole;
                 session.user.organizationId = token.organizationId as string;
             }
             return session;

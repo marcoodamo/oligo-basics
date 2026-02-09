@@ -8,6 +8,8 @@ COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
 # Install dependencies including dev deps for tsx
+# Install dependencies including dev deps for tsx and OpenSSL for Prisma
+RUN apk add --no-cache openssl
 RUN npm ci
 
 # Generate Prisma client
@@ -17,4 +19,4 @@ RUN npx prisma generate
 COPY prisma/seed.ts ./prisma/
 
 # Run migrations and seed
-CMD npx prisma db push --skip-generate && npm run db:seed
+CMD ["/bin/sh", "-c", "npx prisma db push --skip-generate && npm run db:seed"]
